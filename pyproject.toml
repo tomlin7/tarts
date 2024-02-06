@@ -1,0 +1,38 @@
+[build-system]
+requires = ["poetry"]
+build-backend = "poetry.masonry.api"
+
+[tool.poetry]
+name = "tarts"
+version = "0.12.0"
+description = "Client library for managing language server requests & responses."
+authors = [
+    "Billy <billyeatcookies@users.noreply.github.com>", 
+    "Purple Myst <PurpleMyst@users.noreply.github.com>",
+]
+maintainers = ["Billy <billyeatcookies@users.noreply.github.com>",]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/billyeatcookies/tarts"
+keywords = ["tarts", "languageserver"]
+include = ["tarts/py.typed"]
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+dataclasses = { version = "^0.7", python = ">=3.6,<3.7" }
+pydantic = "^1.7.3"
+
+[tool.poetry.dev-dependencies]
+mypy = "^0.790.0"
+black = "18.9b0"
+python-language-server = { extras = ["all"], version = "^0.36.2" }
+pytest = "5.4.3"
+pytest-cov = "^2.10.1"
+lxml = "^4.6.2"
+pyflakes = "^2.2.0"
+
+[tool.black]
+line-length = 88
+target-version = ["py36"]
+# TODO: what's the purpose of specifying exclude here?
+exclude = 'build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.tox/|\.venv/|/playground.py'
