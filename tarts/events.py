@@ -131,6 +131,7 @@ class WillSaveWaitUntilEdits(Event):
 
 class PublishDiagnostics(ServerNotification):
     uri: str
+    version: t.Optional[int]
     diagnostics: t.List[Diagnostic]
 
 

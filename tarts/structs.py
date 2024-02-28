@@ -267,6 +267,12 @@ class DiagnosticSeverity(enum.IntEnum):
     INFORMATION = 3
     HINT = 4
 
+class CodeDescription(BaseModel):
+    href: str
+
+class DiagnosticTag(enum.IntEnum):
+    UNNECESSARY = 1
+    DEPRECATED = 2
 
 class Diagnostic(BaseModel):
     range: Range
@@ -275,11 +281,17 @@ class Diagnostic(BaseModel):
 
     code: t.Optional[t.Union[int, str]]
 
+    codeDescription: t.Optional[CodeDescription]
+
     source: t.Optional[str]
 
     message: str
 
+    tags: t.Optional[t.List[DiagnosticTag]]
+
     relatedInformation: t.Optional[t.List[DiagnosticRelatedInformation]]
+
+    data: t.Optional[t.Any]
 
 
 class MarkedString(BaseModel):
