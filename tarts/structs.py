@@ -2,7 +2,7 @@ import enum
 import typing as t
 from typing_extensions import Literal
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 
 # XXX: Replace the non-commented-out code with what's commented out once nested
 # types become a thing in mypy.
@@ -358,10 +358,9 @@ class CallHierarchyItem(BaseModel):
 class CallHierarchyIncomingCall(BaseModel):
     from_: CallHierarchyItem
     fromRanges: t.List[Range]
-
-    class Config:
-        # 'from' is an invalid field - re-mapping
-        fields = {"from_": "from"}
+    # TODO[pydantic]: The following keys were removed: `fields`.
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
+    model_config = ConfigDict(fields={"from_": "from"})
 
 
 class CallHierarchyOutgoingCall(BaseModel):
