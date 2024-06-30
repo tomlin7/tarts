@@ -4,7 +4,7 @@ build-backend = "poetry.masonry.api"
 
 [tool.poetry]
 name = "tarts"
-version = "0.13.2"
+version = "0.13.3"
 description = "Client library for managing language server requests & responses."
 authors = [
     "Billy <billyeatcookies@users.noreply.github.com>",
@@ -20,7 +20,7 @@ include = ["tarts/py.typed"]
 [tool.poetry.dependencies]
 python = ">=3.10"
 dataclasses = { version = "^0.7", python = ">=3.6,<3.7" }
-pydantic = "^2.7.4"
+pydantic = "^1.7.3"
 
 
 [tool.poetry.group.dev.dependencies]

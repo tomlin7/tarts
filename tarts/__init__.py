@@ -4,4 +4,4 @@ from .client import *
 from .events import *
 from .structs import *
 
-__version__ = "0.13.2"
+__version__ = "0.13.3"
