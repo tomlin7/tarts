@@ -1,8 +1,8 @@
 import enum
 import typing as t
-from typing_extensions import Literal
 
-from pydantic import ConfigDict, BaseModel
+from pydantic import BaseModel
+from typing_extensions import Literal
 
 # XXX: Replace the non-commented-out code with what's commented out once nested
 # types become a thing in mypy.
@@ -10,6 +10,7 @@ from pydantic import ConfigDict, BaseModel
 #                     t.List['JSONValue'], t.Dict[str, 'JSONValue']]
 # JSONDict = t.Dict[str, JSONValue]
 JSONDict = t.Dict[str, t.Any]
+JSONList = t.List[t.Any]
 
 Id = t.Union[int, str]
 
@@ -52,6 +53,7 @@ class TextDocumentIdentifier(BaseModel):
 
 class OptionalVersionedTextDocumentIdentifier(TextDocumentIdentifier):
     version: t.Optional[int]
+
 
 class VersionedTextDocumentIdentifier(TextDocumentIdentifier):
     version: t.Optional[int]
@@ -167,9 +169,11 @@ class TextEdit(BaseModel):
     newText: str
     annotationId: t.Optional[str]
 
+
 class TextDocumentEdit(BaseModel):
     textDocument: OptionalVersionedTextDocumentIdentifier
     edits: t.List[TextEdit]
+
 
 class Command(BaseModel):
     title: str
@@ -267,12 +271,15 @@ class DiagnosticSeverity(enum.IntEnum):
     INFORMATION = 3
     HINT = 4
 
+
 class CodeDescription(BaseModel):
     href: str
+
 
 class DiagnosticTag(enum.IntEnum):
     UNNECESSARY = 1
     DEPRECATED = 2
+
 
 class Diagnostic(BaseModel):
     range: Range
@@ -346,7 +353,7 @@ class SymbolTag(enum.IntEnum):
 
 class CallHierarchyItem(BaseModel):
     name: str
-    king: SymbolKind
+    kind: SymbolKind
     tags: t.Optional[SymbolTag]
     detail: t.Optional[str]
     uri: str
@@ -358,9 +365,10 @@ class CallHierarchyItem(BaseModel):
 class CallHierarchyIncomingCall(BaseModel):
     from_: CallHierarchyItem
     fromRanges: t.List[Range]
-    # TODO[pydantic]: The following keys were removed: `fields`.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
-    model_config = ConfigDict(fields={"from_": "from"})
+
+    class Config:
+        # 'from' is an invalid field - re-mapping
+        fields = {"from_": "from"}
 
 
 class CallHierarchyOutgoingCall(BaseModel):
@@ -383,13 +391,38 @@ class SymbolInformation(BaseModel):
     location: Location
     containerName: t.Optional[str]
 
+
+class InlayHintLabelPart(BaseModel):
+    value: str
+    tooltip: t.Optional[t.Union[str, MarkupContent]]
+    location: t.Optional[Location]
+    command: t.Optional[Command]
+
+
+class InlayHintKind(enum.IntEnum):
+    TYPE = 1
+    PARAMETER = 2
+
+
+class InlayHint(BaseModel):
+    position: Position
+    label: t.Union[str, t.List[InlayHintLabelPart]]
+    kind: t.Optional[InlayHintKind]
+    textEdits: t.Optional[t.List[TextEdit]]
+    tooltip: t.Optional[t.Union[str, MarkupContent]]
+    paddingLeft: t.Optional[bool]
+    paddingRight: t.Optional[bool]
+    data: t.Optional[t.Any]
+
+
 class FoldingRange(BaseModel):
-	startLine: int
-	startCharacter: t.Optional[int]
-	endLine: int
-	endCharacter: t.Optional[int]
-	kind: t.Optional[str] # comment, imports, region
-	collapsedText: t.Optional[str]
+    startLine: int
+    startCharacter: t.Optional[int]
+    endLine: int
+    endCharacter: t.Optional[int]
+    kind: t.Optional[str]  # comment, imports, region
+    collapsedText: t.Optional[str]
+
 
 # Usually a hierarchy, e.g. a symbol with kind=SymbolKind.CLASS contains
 # several SymbolKind.METHOD symbols

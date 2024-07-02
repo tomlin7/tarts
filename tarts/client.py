@@ -3,25 +3,65 @@ import typing as t
 
 from pydantic import ValidationError, parse_obj_as
 
-from .events import (Completion, ConfigurationRequest, Declaration, Definition,
-                     DocumentFormatting, Event, Hover, Implementation,
-                     Initialized, LogMessage, MCallHierarchItems,
-                     MDocumentSymbols, MFoldingRanges, MWorkspaceSymbols,
-                     PublishDiagnostics, References, RegisterCapabilityRequest,
-                     ResponseError, ServerNotification, ServerRequest,
-                     ShowMessage, ShowMessageRequest, Shutdown, SignatureHelp,
-                     TypeDefinition, WillSaveWaitUntilEdits,
-                     WorkDoneProgressBegin, WorkDoneProgressCreate,
-                     WorkDoneProgressEnd, WorkDoneProgressReport,
-                     WorkspaceEdit, WorkspaceFolders)
+from .events import (
+    Completion,
+    ConfigurationRequest,
+    Declaration,
+    Definition,
+    DocumentFormatting,
+    Event,
+    Hover,
+    Implementation,
+    Initialized,
+    LogMessage,
+    MCallHierarchItems,
+    MDocumentSymbols,
+    MFoldingRanges,
+    MInlayHints,
+    MWorkspaceSymbols,
+    PublishDiagnostics,
+    References,
+    RegisterCapabilityRequest,
+    ResponseError,
+    ServerNotification,
+    ServerRequest,
+    ShowMessage,
+    ShowMessageRequest,
+    Shutdown,
+    SignatureHelp,
+    TypeDefinition,
+    WillSaveWaitUntilEdits,
+    WorkDoneProgressBegin,
+    WorkDoneProgressCreate,
+    WorkDoneProgressEnd,
+    WorkDoneProgressReport,
+    WorkspaceEdit,
+    WorkspaceFolders,
+)
 from .io_handler import _make_request, _make_response, _parse_messages
-from .structs import (CompletionContext, CompletionItem, CompletionItemKind,
-                      CompletionList, FormattingOptions, Id, JSONDict,
-                      MWorkDoneProgressKind, Range, Request, Response,
-                      SymbolKind, TextDocumentContentChangeEvent,
-                      TextDocumentIdentifier, TextDocumentItem,
-                      TextDocumentPosition, TextDocumentSaveReason, TextEdit,
-                      VersionedTextDocumentIdentifier, WorkspaceFolder)
+from .structs import (
+    CompletionContext,
+    CompletionItem,
+    CompletionItemKind,
+    CompletionList,
+    FormattingOptions,
+    Id,
+    JSONDict,
+    JSONList,
+    MWorkDoneProgressKind,
+    Range,
+    Request,
+    Response,
+    SymbolKind,
+    TextDocumentContentChangeEvent,
+    TextDocumentIdentifier,
+    TextDocumentItem,
+    TextDocumentPosition,
+    TextDocumentSaveReason,
+    TextEdit,
+    VersionedTextDocumentIdentifier,
+    WorkspaceFolder,
+)
 
 
 class ClientState(enum.Enum):
@@ -54,6 +94,9 @@ CAPABILITIES = {
         "foldingRange": {
             "dynamicRegistration": True,
         },
+        "inlayHint": {
+            "dynamicRegistration": True,
+        },
         "definition": {"dynamicRegistration": True, "linkSupport": True},
         "signatureHelp": {
             "dynamicRegistration": True,
@@ -84,7 +127,7 @@ CAPABILITIES = {
         },
         "workDoneProgress": True,
     },
-"workspace": {
+    "workspace": {
         "symbol": {
             "dynamicRegistration": True,
             "symbolKind": {"valueSet": list(SymbolKind)},
@@ -93,7 +136,7 @@ CAPABILITIES = {
         # TODO 'workspaceEdit':..., #'applyEdit':..., 'executeCommand':...,
         "configuration": True,
         "didChangeConfiguration": {"dynamicRegistration": True},
-    },    
+    },
 }
 
 
@@ -167,8 +210,8 @@ class Client:
 
     def _send_response(
         self,
-        id: int,
-        result: t.Optional[JSONDict] = None,
+        id: int | str,
+        result: t.Optional[t.Union[JSONDict, JSONList]] = None,
         error: t.Optional[JSONDict] = None,
     ) -> None:
         self._send_buf += _make_response(id=id, result=result, error=error)
@@ -213,7 +256,9 @@ class Client:
                     except ValidationError:
                         assert response.result is None
 
-                event = Completion(message_id=response.id, completion_list=completion_list)
+                event = Completion(
+                    message_id=response.id, completion_list=completion_list
+                )
 
             case "textDocument/willSaveWaitUntil":
                 event = WillSaveWaitUntilEdits(
@@ -226,11 +271,11 @@ class Client:
                 else:
                     event = Hover(contents=[])  # null response
                 event.message_id = response.id
-            
+
             case "textDocument/foldingRange":
                 event = parse_obj_as(MFoldingRanges, response)
                 event.message_id = response.id
-            
+
             case "textDocument/signatureHelp":
                 if response.result is not None:
                     event = SignatureHelp.parse_obj(response.result)
@@ -241,7 +286,11 @@ class Client:
             case "textDocument/documentSymbol":
                 event = parse_obj_as(MDocumentSymbols, response)
                 event.message_id = response.id
-            
+
+            case "textDocument/inlayHint":
+                event = parse_obj_as(MInlayHints, response)
+                event.message_id = response.id
+
             case "textDocument/rename":
                 event = parse_obj_as(WorkspaceEdit, response.result)
                 event.message_id = response.id
@@ -410,7 +459,7 @@ class Client:
             method="textDocument/didClose",
             params={"textDocument": text_document.dict()},
         )
-    
+
     def did_change_configuration(self, settings: list[t.Any]) -> None:
         assert self._state == ClientState.NORMAL
         self._send_notification(
@@ -441,10 +490,11 @@ class Client:
             params.update(context.dict())
         return self._send_request(method="textDocument/completion", params=params)
 
-    def rename(self, 
-               text_document_position: TextDocumentPosition,
-               new_name: str,
-               ) -> int:
+    def rename(
+        self,
+        text_document_position: TextDocumentPosition,
+        new_name: str,
+    ) -> int:
         assert self._state == ClientState.NORMAL
         params = {}
         params.update(text_document_position.dict())
@@ -456,7 +506,7 @@ class Client:
         return self._send_request(
             method="textDocument/hover", params=text_document_position.dict()
         )
-    
+
     def folding_range(self, text_document: TextDocumentIdentifier) -> int:
         assert self._state == ClientState.NORMAL
         return self._send_request(
@@ -480,6 +530,13 @@ class Client:
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/declaration", params=text_document_position.dict()
+        )
+
+    def inlay_hint(self, text_document: TextDocumentIdentifier, range: Range) -> int:
+        assert self._state == ClientState.NORMAL
+        return self._send_request(
+            method="textDocument/inlayHint",
+            params={"textDocument": text_document.dict(), "range": range.dict()},
         )
 
     def typeDefinition(self, text_document_position: TextDocumentPosition) -> int:

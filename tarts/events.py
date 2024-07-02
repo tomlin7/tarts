@@ -4,32 +4,34 @@ from pydantic import BaseModel, PrivateAttr
 
 if t.TYPE_CHECKING:  # avoid import cycle at runtime
     from .client import Client
+
 from .structs import (
-    FoldingRange,
-    JSONDict,
-    Diagnostic,
-    MessageType,
-    MessageActionItem,
-    CompletionList,
-    TextEdit,
-    TextDocumentEdit,
-    MarkupContent,
-    Range,
-    Location,
-    MarkedString,
-    SignatureInformation,
-    LocationLink,
     CallHierarchyItem,
-    SymbolInformation,
-    Registration,
+    CompletionList,
+    ConfigurationItem,
+    Diagnostic,
     DocumentSymbol,
-    WorkspaceFolder,
+    FoldingRange,
+    InlayHint,
+    JSONDict,
+    Location,
+    LocationLink,
+    MarkedString,
+    MarkupContent,
+    MessageActionItem,
+    MessageType,
     ProgressToken,
     ProgressValue,
+    Range,
+    Registration,
+    SignatureInformation,
+    SymbolInformation,
+    TextDocumentEdit,
+    TextEdit,
     WorkDoneProgressBeginValue,
-    WorkDoneProgressReportValue,
     WorkDoneProgressEndValue,
-    ConfigurationItem,
+    WorkDoneProgressReportValue,
+    WorkspaceFolder,
 )
 
 Id = t.Union[int, str]
@@ -161,10 +163,12 @@ class Definition(Event):
     message_id: t.Optional[Id]
     result: t.Union[Location, t.List[t.Union[Location, LocationLink]], None]
 
+
 class WorkspaceEdit(Event):
     message_id: t.Optional[Id]
     changes: t.Optional[t.Dict[str, TextEdit]]
     documentChanges: t.Optional[t.List[TextDocumentEdit]]
+
 
 # result is a list, so putting in a custom class
 class References(Event):
@@ -182,9 +186,16 @@ class Implementation(Event):
 class MWorkspaceSymbols(Event):
     result: t.Union[t.List[SymbolInformation], None]
 
+
 class MFoldingRanges(Event):
     message_id: t.Optional[Id]
     result: t.Optional[t.List[FoldingRange]]
+
+
+class MInlayHints(Event):
+    message_id: t.Optional[Id]
+    result: t.Optional[t.List[InlayHint]]
+
 
 class MDocumentSymbols(Event):
     message_id: t.Optional[Id]
@@ -205,9 +216,11 @@ class RegisterCapabilityRequest(ServerRequest):
     def reply(self) -> None:
         self._client._send_response(id=self._id, result={})
 
+
 class DocumentFormatting(Event):
     message_id: t.Optional[Id]
     result: t.Union[t.List[TextEdit], None]
+
 
 class WorkspaceFolders(ServerRequest):
     result: t.Optional[t.List[WorkspaceFolder]]
