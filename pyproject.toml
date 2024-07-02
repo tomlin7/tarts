@@ -3,11 +3,10 @@ requires = ["poetry"]
 build-backend = "poetry.masonry.api"
 
 [tool.poetry]
-name = "sansio-lsp-client"
-version = "0.12.0"
+name = "tarts"
+version = "0.14.0"
 description = """
-An implementation of the client side of the LSP protocol, useful for \
-embedding easily in your editor.\
+Tarts is a client library for managing language server requests & responses.\
 """
 authors = ["Purple Myst <PurpleMyst@users.noreply.github.com>"]
 license = "MIT"
