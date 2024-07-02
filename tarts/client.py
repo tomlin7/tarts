@@ -1,65 +1,27 @@
 import enum
 import typing as t
 
-from pydantic import parse_obj_as, ValidationError
+from pydantic import ValidationError, parse_obj_as
 
-from .events import (
-    MFoldingRanges,
-    ResponseError,
-    Initialized,
-    Completion,
-    ServerRequest,
-    Shutdown,
-    PublishDiagnostics,
-    Event,
-    ShowMessage,
-    ServerNotification,
-    WillSaveWaitUntilEdits,
-    ShowMessageRequest,
-    LogMessage,
-    Hover,
-    SignatureHelp,
-    Definition,
-    References,
-    MCallHierarchItems,
-    Implementation,
-    MWorkspaceSymbols,
-    Declaration,
-    TypeDefinition,
-    RegisterCapabilityRequest,
-    MDocumentSymbols,
-    DocumentFormatting,
-    WorkDoneProgressCreate,
-    WorkDoneProgressBegin,
-    WorkDoneProgressReport,
-    WorkDoneProgressEnd,
-    ConfigurationRequest,
-    WorkspaceEdit,
-    WorkspaceFolders,
-)
-from .structs import (
-    Response,
-    TextDocumentPosition,
-    CompletionContext,
-    CompletionList,
-    CompletionItemKind,
-    CompletionItem,
-    Request,
-    JSONDict,
-    TextDocumentItem,
-    TextDocumentIdentifier,
-    VersionedTextDocumentIdentifier,
-    TextDocumentContentChangeEvent,
-    TextDocumentSaveReason,
-    TextEdit,
-    Id,
-    SymbolKind,
-    FormattingOptions,
-    Range,
-    WorkspaceFolder,
-    MWorkDoneProgressKind,
-)
-from .io_handler import _make_request, _parse_messages, _make_response
+from .events import (Completion, ConfigurationRequest, Declaration, Definition,
+                     DocumentFormatting, Event, Hover, Implementation,
+                     Initialized, LogMessage, MCallHierarchItems,
+                     MDocumentSymbols, MFoldingRanges, MWorkspaceSymbols,
+                     PublishDiagnostics, References, RegisterCapabilityRequest,
+                     ResponseError, ServerNotification, ServerRequest,
+                     ShowMessage, ShowMessageRequest, Shutdown, SignatureHelp,
+                     TypeDefinition, WillSaveWaitUntilEdits,
+                     WorkDoneProgressBegin, WorkDoneProgressCreate,
+                     WorkDoneProgressEnd, WorkDoneProgressReport,
+                     WorkspaceEdit, WorkspaceFolders)
+from .io_handler import _make_request, _make_response, _parse_messages
+from .structs import (CompletionContext, CompletionItem, CompletionItemKind,
+                      CompletionList, FormattingOptions, Id, JSONDict,
+                      MWorkDoneProgressKind, Range, Request, Response,
+                      SymbolKind, TextDocumentContentChangeEvent,
+                      TextDocumentIdentifier, TextDocumentItem,
+                      TextDocumentPosition, TextDocumentSaveReason, TextEdit,
+                      VersionedTextDocumentIdentifier, WorkspaceFolder)
 
 
 class ClientState(enum.Enum):
@@ -447,6 +409,12 @@ class Client:
         self._send_notification(
             method="textDocument/didClose",
             params={"textDocument": text_document.dict()},
+        )
+    
+    def did_change_configuration(self, settings: list[t.Any]) -> None:
+        assert self._state == ClientState.NORMAL
+        self._send_notification(
+            method="workspace/didChangeConfiguration", params=settings
         )
 
     def did_change_workspace_folders(
