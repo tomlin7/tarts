@@ -3,68 +3,14 @@ import typing as t
 
 from pydantic import ValidationError, parse_obj_as
 
-from .events import (
-    Completion,
-    ConfigurationRequest,
-    Declaration,
-    Definition,
-    DocumentFormatting,
-    Event,
-    Hover,
-    Implementation,
-    Initialized,
-    LogMessage,
-    MCallHierarchItems,
-    MDocumentSymbols,
-    MFoldingRanges,
-    MInlayHints,
-    MWorkspaceSymbols,
-    PublishDiagnostics,
-    References,
-    RegisterCapabilityRequest,
-    ResponseError,
-    ServerNotification,
-    ServerRequest,
-    ShowMessage,
-    ShowMessageRequest,
-    Shutdown,
-    SignatureHelp,
-    TypeDefinition,
-    WillSaveWaitUntilEdits,
-    WorkDoneProgressBegin,
-    WorkDoneProgressCreate,
-    WorkDoneProgressEnd,
-    WorkDoneProgressReport,
-    WorkspaceEdit,
-    WorkspaceFolders,
-)
+from .events import *
 from .io_handler import _make_request, _make_response, _parse_messages
-from .structs import (
-    CompletionContext,
-    CompletionItem,
-    CompletionItemKind,
-    CompletionList,
-    FormattingOptions,
-    Id,
-    JSONDict,
-    JSONList,
-    MWorkDoneProgressKind,
-    Range,
-    Request,
-    Response,
-    SymbolKind,
-    TextDocumentContentChangeEvent,
-    TextDocumentIdentifier,
-    TextDocumentItem,
-    TextDocumentPosition,
-    TextDocumentSaveReason,
-    TextEdit,
-    VersionedTextDocumentIdentifier,
-    WorkspaceFolder,
-)
+from .structs import *
 
 
 class ClientState(enum.Enum):
+    """The state of a client."""
+
     NOT_INITIALIZED = enum.auto()
     WAITING_FOR_INITIALIZED = enum.auto()
     NORMAL = enum.auto()
@@ -141,6 +87,27 @@ CAPABILITIES = {
 
 
 class Client:
+    """A Sans-IO client for the communicating with a Language Servers
+
+    This client does not handle any IO itself, but instead provides methods for
+    generating requests and parsing responses. The user is expected to call
+    `send` to get the bytes to send to the server, and `recv` to feed the bytes
+    received from the server back into the client.
+
+    The client will keep track of the state of the connection, and will raise
+    an error if the user tries to send a request that is not allowed in the
+    current state.
+
+    Args:
+        process_id: The process ID of the client. This is used for logging
+            purposes.
+        root_uri: The root URI of the workspace. This is used for logging
+            purposes.
+        workspace_folders: A list of workspace folders. This is used for logging
+            purposes.
+        trace: The trace level to use. This is used for logging purposes.
+    """
+
     # TODO: Save the encoding given here.
     def __init__(
         self,
@@ -186,16 +153,31 @@ class Client:
 
     @property
     def state(self) -> ClientState:
+        """The current state of the client."""
         return self._state
 
     @property
     def is_initialized(self) -> bool:
+        """Whether the client has been initialized."""
         return (
             self._state != ClientState.NOT_INITIALIZED
             and self._state != ClientState.WAITING_FOR_INITIALIZED
         )
 
     def _send_request(self, method: str, params: t.Optional[JSONDict] = None) -> int:
+        """Send a request to the server.
+
+        This method can be used to send requests that are not implemented in the
+        client. It will also automatically generate an ID for the request.
+
+        Args:
+            method: The method of the request.
+            params: The parameters of the request.
+
+        Returns:
+            The ID of the request.
+        """
+
         id = self._id_counter
         self._id_counter += 1
 
@@ -206,6 +188,15 @@ class Client:
     def _send_notification(
         self, method: str, params: t.Optional[JSONDict] = None
     ) -> None:
+        """Send a notification to the server.
+
+        This method can be used to send notifications that are not implemented in
+        the client.
+
+        Args:
+            method: The method of the notification.
+            params: The parameters of the notification.
+        """
         self._send_buf += _make_request(method=method, params=params)
 
     def _send_response(
@@ -214,6 +205,17 @@ class Client:
         result: t.Optional[t.Union[JSONDict, JSONList]] = None,
         error: t.Optional[JSONDict] = None,
     ) -> None:
+        """Send a response to the server.
+
+        This method can be used to send responses that are not implemented in the
+        client.
+
+        Args:
+            id: The ID of the request that this response is for.
+            result: The result of the request.
+            error: The error of the request
+        """
+
         self._send_buf += _make_response(id=id, result=result, error=error)
 
     # response from server
@@ -375,6 +377,18 @@ class Client:
             raise NotImplementedError(request)
 
     def recv(self, data: bytes) -> t.Iterator[Event]:
+        """Feed data received from the server back into the client.
+
+        This method will parse the data received from the server, and yield any
+        events that are generated by the data. If the data is not enough to
+        generate a full event, the data will be saved until enough data is
+        received.
+
+        Args:
+            data: The data received from the server.
+
+        Yields:
+            The events generated by the data."""
         self._recv_buf += data
         # Make sure to use lots of iterators, so that if one message fails to
         # parse, the messages before it are yielded successfully before the
@@ -386,27 +400,60 @@ class Client:
                 yield self._handle_request(message)
 
     def send(self) -> bytes:
+        """Get the bytes to send to the server.
+
+        This method will return the bytes that need to be sent to the server.
+        This is the main way to interact with the client.
+
+        Returns:
+            The bytes to send to the server.
+        """
+
         send_buf = self._send_buf[:]
         self._send_buf.clear()
         return send_buf
 
     def shutdown(self) -> None:
+        """Send a shutdown request to the server.
+
+        This method will send a shutdown request to the server. After this
+        request is sent, the client will be in the `WAITING_FOR_SHUTDOWN` state."""
+
         assert self._state == ClientState.NORMAL
         self._send_request(method="shutdown")
         self._state = ClientState.WAITING_FOR_SHUTDOWN
 
     def exit(self) -> None:
+        """Send an exit notification to the server.
+
+        This method will send an exit notification to the server. After this
+        notification is sent, the client will be in the `EXITED` state."""
         assert self._state == ClientState.SHUTDOWN
         # TODO: figure out why params={} is needed
         self._send_notification(method="exit", params={})
         self._state = ClientState.EXITED
 
     def cancel_last_request(self) -> None:
+        """Cancel the last request sent to the server.
+
+        This method will cancel the last request sent to the server. This is
+        useful if the request is taking too long to process."""
+
         self._send_notification(
             method="$/cancelRequest", params={"id": self._id_counter - 1}
         )
 
     def did_open(self, text_document: TextDocumentItem) -> None:
+        """Send a didOpen notification to the server.
+
+        This method will send a didOpen notification to the server. This
+        notification is used to inform the server that a document has been
+        opened.
+
+        Args:
+            text_document: The text document that has been opened.
+        """
+
         assert self._state == ClientState.NORMAL
         self._send_notification(
             method="textDocument/didOpen", params={"textDocument": text_document.dict()}
@@ -417,6 +464,17 @@ class Client:
         text_document: VersionedTextDocumentIdentifier,
         content_changes: t.List[TextDocumentContentChangeEvent],
     ) -> None:
+        """Send a didChange notification to the server.
+
+        This method will send a didChange notification to the server. This
+        notification is used to inform the server that a document has been
+        changed.
+
+        Args:
+            text_document: The text document that has been changed.
+            content_changes: The changes that have been made to the document.
+        """
+
         assert self._state == ClientState.NORMAL
         self._send_notification(
             method="textDocument/didChange",
@@ -429,6 +487,16 @@ class Client:
     def will_save(
         self, text_document: TextDocumentIdentifier, reason: TextDocumentSaveReason
     ) -> None:
+        """Send a willSave notification to the server.
+
+        This method will send a willSave notification to the server. This
+        notification is used to inform the server that a document will be saved.
+
+        Args:
+            text_document: The text document that will be saved.
+            reason: The reason the document will be saved.
+        """
+
         assert self._state == ClientState.NORMAL
         self._send_notification(
             method="textDocument/willSave",
@@ -438,6 +506,15 @@ class Client:
     def will_save_wait_until(
         self, text_document: TextDocumentIdentifier, reason: TextDocumentSaveReason
     ) -> None:
+        """Send a willSaveWaitUntil request to the server.
+
+        This method will send a willSaveWaitUntil request to the server. This
+
+        Args:
+            text_document: The text document that will be saved.
+            reason: The reason the document will be saved.
+        """
+
         assert self._state == ClientState.NORMAL
         self._send_request(
             method="textDocument/willSaveWaitUntil",
@@ -447,6 +524,18 @@ class Client:
     def did_save(
         self, text_document: TextDocumentIdentifier, text: t.Optional[str] = None
     ) -> None:
+        """Send a didSave notification to the server.
+
+        This method will send a didSave notification to the server. This
+        notification is used to inform the server that a document has been saved.
+
+        Args:
+            text_document: The text document that has been saved.
+            text: The text of the document that has been saved. This is optional,
+                and can be used to send the text of the document if it has changed
+                since the last didChange notification.
+        """
+
         assert self._state == ClientState.NORMAL
         params: t.Dict[str, t.Any] = {"textDocument": text_document.dict()}
         if text is not None:
@@ -454,6 +543,15 @@ class Client:
         self._send_notification(method="textDocument/didSave", params=params)
 
     def did_close(self, text_document: TextDocumentIdentifier) -> None:
+        """Send a didClose notification to the server.
+
+        This method will send a didClose notification to the server. This
+        notification is used to inform the server that a document has been closed.
+
+        Args:
+            text_document: The text document that has been closed.
+        """
+
         assert self._state == ClientState.NORMAL
         self._send_notification(
             method="textDocument/didClose",
@@ -461,6 +559,15 @@ class Client:
         )
 
     def did_change_configuration(self, settings: list[t.Any]) -> None:
+        """Send a didChangeConfiguration notification to the server.
+
+        This method will send a didChangeConfiguration notification to the server.
+        This notification is used to inform the server that the configuration has
+        changed.
+
+        Args:
+            settings: The new settings.
+        """
         assert self._state == ClientState.NORMAL
         self._send_notification(
             method="workspace/didChangeConfiguration", params=settings
@@ -469,6 +576,17 @@ class Client:
     def did_change_workspace_folders(
         self, added: t.List[WorkspaceFolder], removed: t.List[WorkspaceFolder]
     ) -> None:
+        """Send a didChangeWorkspaceFolders notification to the server.
+
+        This method will send a didChangeWorkspaceFolders notification to the
+        server. This notification is used to inform the server that workspace
+        folders have been added or removed.
+
+        Args:
+            added: The workspace folders that have been added.
+            removed: The workspace folders that have been removed.
+        """
+
         assert self._state == ClientState.NORMAL
         params = {
             "added": [f.dict() for f in added],
@@ -483,6 +601,20 @@ class Client:
         text_document_position: TextDocumentPosition,
         context: t.Optional[CompletionContext] = None,
     ) -> int:
+        """Send a completion request to the server.
+
+        This method will send a completion request to the server. This request is
+        used to request completion items at a specific position in a document.
+
+        Args:
+            text_document_position: The position in the document to request
+                completions for.
+            context: The context in which the completion is requested.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         params = {}
         params.update(text_document_position.dict())
@@ -495,6 +627,19 @@ class Client:
         text_document_position: TextDocumentPosition,
         new_name: str,
     ) -> int:
+        """Send a rename request to the server.
+
+        This method will send a rename request to the server. This request is
+        used to request that the server rename a symbol in a document.
+
+        Args:
+            text_document_position: The position in the document to rename.
+            new_name: The new name of the symbol.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         params = {}
         params.update(text_document_position.dict())
@@ -502,12 +647,37 @@ class Client:
         return self._send_request(method="textDocument/rename", params=params)
 
     def hover(self, text_document_position: TextDocumentPosition) -> int:
+        """Send a hover request to the server.
+
+        This method will send a hover request to the server. This request is
+        used to request hover information at a specific position in a document.
+
+        Args:
+            text_document_position: The position in the document to request
+                hover information for.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/hover", params=text_document_position.dict()
         )
 
     def folding_range(self, text_document: TextDocumentIdentifier) -> int:
+        """Send a foldingRange request to the server.
+
+        This method will send a foldingRange request to the server. This request is
+        used to request folding ranges in a document.
+
+        Args:
+            text_document: The document to request folding ranges for.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/foldingRange",
@@ -515,24 +685,78 @@ class Client:
         )
 
     def signatureHelp(self, text_document_position: TextDocumentPosition) -> int:
+        """Send a signatureHelp request to the server.
+
+        This method will send a signatureHelp request to the server. This request is
+        used to request signature help at a specific position in a document.
+
+        Args:
+            text_document_position: The position in the document to request
+                signature help for.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/signatureHelp", params=text_document_position.dict()
         )
 
     def definition(self, text_document_position: TextDocumentPosition) -> int:
+        """Send a definition request to the server.
+
+        This method will send a definition request to the server. This request is
+        used to request the definition of a symbol at a specific position in a
+        document.
+
+        Args:
+            text_document_position: The position in the document to request
+                the definition for.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/definition", params=text_document_position.dict()
         )
 
     def declaration(self, text_document_position: TextDocumentPosition) -> int:
+        """Send a declaration request to the server.
+
+        This method will send a declaration request to the server. This request is
+        used to request the declaration of a symbol at a specific position in a
+        document.
+
+        Args:
+            text_document_position: The position in the document to request
+                the declaration for.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/declaration", params=text_document_position.dict()
         )
 
     def inlay_hint(self, text_document: TextDocumentIdentifier, range: Range) -> int:
+        """Send a inlayHint request to the server.
+
+        This method will send a inlayHint request to the server. This request is
+        used to request inlay hints in a document.
+
+        Args:
+            text_document: The document to request inlay hints for.
+            range: The range to request inlay hints for.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/inlayHint",
@@ -540,12 +764,38 @@ class Client:
         )
 
     def typeDefinition(self, text_document_position: TextDocumentPosition) -> int:
+        """Send a typeDefinition request to the server.
+
+        This method will send a typeDefinition request to the server. This request is
+        used to request the type definition of a symbol at a specific position in a
+        document.
+
+        Args:
+            text_document_position: The position in the document to request
+                the type definition for.
+
+        Returns:
+            The ID of the request."""
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/typeDefinition", params=text_document_position.dict()
         )
 
     def references(self, text_document_position: TextDocumentPosition) -> int:
+        """Send a references request to the server.
+
+        This method will send a references request to the server. This request is
+        used to request references to a symbol at a specific position in a
+        document.
+
+        Args:
+            text_document_position: The position in the document to request
+                references for.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         params = {
             "context": {"includeDeclaration": True},
@@ -555,6 +805,20 @@ class Client:
 
     # TODO incomplete
     def prepareCallHierarchy(self, text_document_position: TextDocumentPosition) -> int:
+        """Send a prepareCallHierarchy request to the server.
+
+        This method will send a prepareCallHierarchy request to the server. This
+        request is used to request call hierarchy information at a specific position
+        in a document.
+
+        Args:
+            text_document_position: The position in the document to request
+                call hierarchy information for.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/prepareCallHierarchy",
@@ -562,16 +826,54 @@ class Client:
         )
 
     def implementation(self, text_document_position: TextDocumentPosition) -> int:
+        """Send a implementation request to the server.
+
+        This method will send a implementation request to the server. This request is
+        used to request the implementation of a symbol at a specific position in a
+        document.
+
+        Args:
+            text_document_position: The position in the document to request
+                the implementation for.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/implementation", params=text_document_position.dict()
         )
 
     def workspace_symbol(self, query: str = "") -> int:
+        """Send a workspace/symbol request to the server.
+
+        This method will send a workspace/symbol request to the server. This request
+        is used to request symbols in the workspace.
+
+        Args:
+            query: The query to filter symbols by.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         return self._send_request(method="workspace/symbol", params={"query": query})
 
     def documentSymbol(self, text_document: TextDocumentIdentifier) -> int:
+        """Send a documentSymbol request to the server.
+
+        This method will send a documentSymbol request to the server. This request
+        is used to request symbols in a document.
+
+        Args:
+            text_document: The document to request symbols for.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         return self._send_request(
             method="textDocument/documentSymbol",
@@ -581,6 +883,19 @@ class Client:
     def formatting(
         self, text_document: TextDocumentIdentifier, options: FormattingOptions
     ) -> int:
+        """Send a formatting request to the server.
+
+        This method will send a formatting request to the server. This request is
+        used to request formatting for a document.
+
+        Args:
+            text_document: The document to request formatting for.
+            options: The options to use for formatting.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         params = {"textDocument": text_document.dict(), "options": options.dict()}
         return self._send_request(method="textDocument/formatting", params=params)
@@ -591,6 +906,20 @@ class Client:
         range: Range,
         options: FormattingOptions,
     ) -> int:
+        """Send a rangeFormatting request to the server.
+
+        This method will send a rangeFormatting request to the server. This request
+        is used to request formatting for a range in a document.
+
+        Args:
+            text_document: The document to request formatting for.
+            range: The range to request formatting for.
+            options: The options to use for formatting.
+
+        Returns:
+            The ID of the request.
+        """
+
         assert self._state == ClientState.NORMAL
         params = {
             "textDocument": text_document.dict(),

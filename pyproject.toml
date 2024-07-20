@@ -4,7 +4,7 @@ build-backend = "poetry.masonry.api"
 
 [tool.poetry]
 name = "tarts"
-version = "0.14.0"
+version = "0.15.0"
 description = """
 Tarts is a client library for managing language server requests & responses.\
 """
