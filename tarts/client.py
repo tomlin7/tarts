@@ -115,6 +115,9 @@ class Client:
         root_uri: t.Optional[str] = None,
         workspace_folders: t.Optional[t.List[WorkspaceFolder]] = None,
         trace: str = "off",
+        capabilities: t.Optional[JSONDict] = CAPABILITIES,
+        initialize_options: t.Optional[JSONDict] = {},
+        initialize: bool = True,
     ) -> None:
         self._state = ClientState.NOT_INITIALIZED
 
@@ -134,22 +137,25 @@ class Client:
         # it would just litter the code unnecessarily.
         self._id_counter = 0
 
-        # We'll just immediately send off an "initialize" request.
-        self._send_request(
-            method="initialize",
-            params={
-                "processId": process_id,
-                "rootUri": root_uri,
-                "workspaceFolders": (
-                    None
-                    if workspace_folders is None
-                    else [f.dict() for f in workspace_folders]
-                ),
-                "trace": trace,
-                "capabilities": CAPABILITIES,
-            },
-        )
-        self._state = ClientState.WAITING_FOR_INITIALIZED
+        self._state = ClientState.NOT_INITIALIZED
+
+        if initialize:
+            self._send_request(
+                method="initialize",
+                params={
+                    "processId": process_id,
+                    "rootUri": root_uri,
+                    "workspaceFolders": (
+                        None
+                        if workspace_folders is None
+                        else [f.model_dump() for f in workspace_folders]
+                    ),
+                    "trace": trace,
+                    "capabilities": capabilities,
+                }
+                + initialize_options,
+            )
+            self._state = ClientState.WAITING_FOR_INITIALIZED
 
     @property
     def state(self) -> ClientState:
