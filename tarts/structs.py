@@ -1,7 +1,7 @@
 import enum
 import typing as t
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 from typing_extensions import Literal
 
 # XXX: Replace the non-commented-out code with what's commented out once nested
@@ -732,10 +732,9 @@ class CallHierarchyIncomingCall(BaseModel):
 
     from_: CallHierarchyItem
     fromRanges: t.List[Range]
-
-    class Config:
-        # 'from' is an invalid field - re-mapping
-        fields = {"from_": "from"}
+    # TODO[pydantic]: The following keys were removed: `fields`.
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
+    model_config = ConfigDict(fields={"from_": "from"})
 
 
 class CallHierarchyOutgoingCall(BaseModel):

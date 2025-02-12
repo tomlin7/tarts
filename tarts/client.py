@@ -139,21 +139,25 @@ class Client:
 
         self._state = ClientState.NOT_INITIALIZED
 
+        d = {
+            "processId": process_id,
+            "rootUri": root_uri,
+            "workspaceFolders": (
+                None
+                if workspace_folders is None
+                else [f.model_dump() for f in workspace_folders]
+            ),
+            "trace": trace,
+            "capabilities": capabilities,
+        }
+
+        if initialize_options:
+            d.update(initialize_options)
+
         if initialize:
             self._send_request(
                 method="initialize",
-                params={
-                    "processId": process_id,
-                    "rootUri": root_uri,
-                    "workspaceFolders": (
-                        None
-                        if workspace_folders is None
-                        else [f.model_dump() for f in workspace_folders]
-                    ),
-                    "trace": trace,
-                    "capabilities": capabilities,
-                }
-                + initialize_options,
+                params=d
             )
             self._state = ClientState.WAITING_FOR_INITIALIZED
 
