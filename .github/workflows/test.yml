@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.10", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,7 +21,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: 18
       - run: |
           mkdir tests/langservers
       - run: |
@@ -29,11 +29,10 @@ jobs:
       - shell: bash
         run: |
           cd tests/langservers
-          for VERSION in 10.0.0 11.0.0; do
-            wget "https://github.com/clangd/clangd/releases/download/$VERSION/clangd-linux-$VERSION.zip"
-            python3 -m zipfile -e "clangd-linux-$VERSION.zip" .
-            chmod +x clangd_$VERSION/bin/clangd
-          done
+          wget "https://github.com/clangd/clangd/releases/download/19.1.2/clangd-linux-19.1.2.zip"
+          python3 -m zipfile -e "clangd-linux-19.1.2.zip" .
+          chmod +x clangd_19.1.2/bin/clangd
+        
         # TODO: go fails to install
       #      - name: Install Go
       #        uses: actions/setup-go@v2
@@ -45,7 +44,7 @@ jobs:
           pip install poetry && poetry install
       - run: |
           poetry run pytest --cov=sansio_lsp_client --cov-report=xml:cov.xml -v
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: cov.xml

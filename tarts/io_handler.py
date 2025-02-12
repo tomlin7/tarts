@@ -1,6 +1,6 @@
-import cgi
 import json
 import typing as t
+from email.message import Message
 
 from pydantic import parse_obj_as
 
@@ -119,9 +119,11 @@ def _parse_one_message(
     assert set(headers.keys()) == {"content-type", "content-length"}
 
     # Content-Type and encoding.
-    content_type, metadata = cgi.parse_header(headers["content-type"])
+    msg = Message()
+    msg['Content-Type'] = headers["content-type"]
+    content_type = msg.get_content_type()
     assert content_type == "application/vscode-jsonrpc"
-    encoding = metadata["charset"]
+    encoding = msg.get_param("charset")
 
     # Content-Length
     content_length = int(headers["content-length"])
