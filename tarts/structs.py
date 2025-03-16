@@ -1,7 +1,7 @@
 import enum
 import typing as t
 
-from pydantic import ConfigDict, BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 # XXX: Replace the non-commented-out code with what's commented out once nested
@@ -23,13 +23,11 @@ class Request(BaseModel):
     Args:
         method(str): The method of the request.
         id (Id): The request ID.
-        params (JSONDict): The parameters of the request.
+        params (list | JSONDict): The parameters of the request.
     """
-
     method: str
-    id: t.Optional[Id]
-    params: t.Optional[JSONDict]
-
+    id: t.Optional[Id] = None
+    params: t.Optional[JSONDict] = None
 
 class Response(BaseModel):
     """Base class for LSP responses.
@@ -41,11 +39,9 @@ class Response(BaseModel):
         result(List[Any] | JSONDict): The result of the request.
         error: The error that occurred during the request.
     """
-
-    id: t.Optional[Id]
-    result: t.Optional[t.Union[t.List[t.Any], JSONDict]]
-    error: t.Optional[JSONDict]
-
+    id: t.Optional[Id] = None
+    result: t.Optional[t.Union[t.List[t.Any], JSONDict]] = None
+    error: t.Optional[JSONDict] = None
 
 class MessageType(enum.IntEnum):
     """Message type for LSP notifications.
@@ -55,12 +51,14 @@ class MessageType(enum.IntEnum):
         WARNING: Warning message.
         INFO: Information message.
         LOG: Log message.
+        DEBUG: Debug message.
     """
 
-    ERROR: int = 1
-    WARNING: int = 2
-    INFO: int = 3
-    LOG: int = 4
+    ERROR = 1
+    WARNING = 2
+    INFO = 3
+    LOG = 4
+    DEBUG = 5
 
 
 class MessageActionItem(BaseModel):
@@ -198,13 +196,13 @@ class TextDocumentContentChangeEvent(BaseModel):
     range: t.Optional[Range]
     rangeLength: t.Optional[int]  # deprecated, use .range
 
-    def dict(self, **kwargs: t.Any) -> t.Dict[str, t.Any]:
+    def model_dump(self, **kwargs: t.Any) -> t.Dict[str, t.Any]:
         """Return a dictionary representation of the event.
 
         Returns:
             Dict[str, Any]: A dictionary representation of the event.
         """
-        d = super().dict(**kwargs)
+        d = super().model_dump(**kwargs)
 
         # vscode-css server requires un-filled values to be absent
         # TODO: add vscode-css to tests
@@ -257,7 +255,7 @@ class TextDocumentContentChangeEvent(BaseModel):
         Returns:
             TextDocumentContentChangeEvent: A new instance representing the whole document change.
         """
-        return cls(text=change_text)
+        return cls(text=change_text, range=None, rangeLength=None)
 
 
 class TextDocumentPosition(BaseModel):
@@ -295,7 +293,7 @@ class CompletionContext(BaseModel):
     """
 
     triggerKind: CompletionTriggerKind
-    triggerCharacter: t.Optional[str]
+    triggerCharacter: t.Optional[str] = None
 
 
 class MarkupKind(enum.Enum):
@@ -333,7 +331,7 @@ class TextEdit(BaseModel):
 
     range: Range
     newText: str
-    annotationId: t.Optional[str]
+    annotationId: t.Optional[str] = None
 
 
 class TextDocumentEdit(BaseModel):
@@ -441,21 +439,21 @@ class CompletionItem(BaseModel):
     """
 
     label: str
-    kind: t.Optional[CompletionItemKind]
-    tags: t.Optional[CompletionItemTag]
-    detail: t.Optional[str]
-    documentation: t.Union[str, MarkupContent, None]
-    deprecated: t.Optional[bool]
-    preselect: t.Optional[bool]
-    sortText: t.Optional[str]
-    filterText: t.Optional[str]
-    insertText: t.Optional[str]
-    insertTextFormat: t.Optional[InsertTextFormat]
-    textEdit: t.Optional[TextEdit]
-    additionalTextEdits: t.Optional[t.List[TextEdit]]
-    commitCharacters: t.Optional[t.List[str]]
-    command: t.Optional[Command]
-    data: t.Optional[t.Any]
+    kind: t.Optional[CompletionItemKind] = None
+    tags: t.Optional[CompletionItemTag] = None
+    detail: t.Optional[str] = None
+    documentation: t.Union[str, MarkupContent, None] = None
+    deprecated: t.Optional[bool] = None
+    preselect: t.Optional[bool] = None
+    sortText: t.Optional[str] = None
+    filterText: t.Optional[str] = None
+    insertText: t.Optional[str] = None
+    insertTextFormat: t.Optional[InsertTextFormat] = None
+    textEdit: t.Optional[TextEdit] = None
+    additionalTextEdits: t.Optional[t.List[TextEdit]] = None
+    commitCharacters: t.Optional[t.List[str]] = None
+    command: t.Optional[Command] = None
+    data: t.Optional[t.Any] = None
 
 
 class CompletionList(BaseModel):
@@ -506,7 +504,7 @@ class LocationLink(BaseModel):
         targetSelectionRange (Range): The span of the target of this link.
     """
 
-    originSelectionRange: t.Optional[Range]
+    originSelectionRange: t.Optional[Range] = None
     targetUri: str  # in the spec the type is DocumentUri
     targetRange: Range
     targetSelectionRange: Range
@@ -578,14 +576,14 @@ class Diagnostic(BaseModel):
     """
 
     range: Range
-    severity: t.Optional[DiagnosticSeverity]
-    code: t.Optional[t.Union[int, str]]
-    codeDescription: t.Optional[CodeDescription]
-    source: t.Optional[str]
+    severity: t.Optional[DiagnosticSeverity] = None
+    code: t.Optional[t.Union[int, str]] = None
+    codeDescription: t.Optional[CodeDescription] = None
+    source: t.Optional[str] = None
+    tags: t.Optional[t.List[DiagnosticTag]] = None
     message: str
-    tags: t.Optional[t.List[DiagnosticTag]]
-    relatedInformation: t.Optional[t.List[DiagnosticRelatedInformation]]
-    data: t.Optional[t.Any]
+    relatedInformation: t.Optional[t.List[DiagnosticRelatedInformation]] = None
+    data: t.Optional[t.Any] = None
 
 
 class MarkedString(BaseModel):
@@ -609,7 +607,7 @@ class ParameterInformation(BaseModel):
     """
 
     label: t.Union[str, t.Tuple[int, int]]
-    documentation: t.Optional[t.Union[str, MarkupContent]]
+    documentation: t.Optional[t.Union[str, MarkupContent]] = None
 
 
 class SignatureInformation(BaseModel):
@@ -623,9 +621,9 @@ class SignatureInformation(BaseModel):
     """
 
     label: str
-    documentation: t.Optional[t.Union[MarkupContent, str]]
-    parameters: t.Optional[t.List[ParameterInformation]]
-    activeParameter: t.Optional[int]
+    documentation: t.Optional[t.Union[MarkupContent, str]] = None
+    parameters: t.Optional[t.List[ParameterInformation]] = None
+    activeParameter: t.Optional[int] = None
 
 
 class SymbolKind(enum.IntEnum):
@@ -714,12 +712,12 @@ class CallHierarchyItem(BaseModel):
 
     name: str
     kind: SymbolKind
-    tags: t.Optional[SymbolTag]
-    detail: t.Optional[str]
+    tags: t.Optional[SymbolTag] = None
+    detail: t.Optional[str] = None
     uri: str
     range: Range
     selectionRange: Range
-    data: t.Optional[t.Any]
+    data: t.Optional[t.Any] = None
 
 
 class CallHierarchyIncomingCall(BaseModel):
@@ -730,11 +728,13 @@ class CallHierarchyIncomingCall(BaseModel):
         fromRanges (List[Range]): The ranges at which the calls appear.
     """
 
-    from_: CallHierarchyItem
+    from_: CallHierarchyItem = Field(alias="from")
     fromRanges: t.List[Range]
-    # TODO[pydantic]: The following keys were removed: `fields`.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
-    model_config = ConfigDict(fields={"from_": "from"})
+
+    # deprecated
+    # class Config:
+    #     # 'from' is an invalid field - re-mapping
+    #     fields = {"from_": "from"}
 
 
 class CallHierarchyOutgoingCall(BaseModel):
@@ -777,10 +777,10 @@ class SymbolInformation(BaseModel):
 
     name: str
     kind: SymbolKind
-    tags: t.Optional[t.List[SymbolTag]]
-    deprecated: t.Optional[bool]
+    tags: t.Optional[t.List[SymbolTag]] = None
+    deprecated: t.Optional[bool] = None
     location: Location
-    containerName: t.Optional[str]
+    containerName: t.Optional[str] = None
 
 
 class InlayHintLabelPart(BaseModel):
@@ -795,8 +795,8 @@ class InlayHintLabelPart(BaseModel):
 
     value: str
     tooltip: t.Optional[t.Union[str, MarkupContent]]
-    location: t.Optional[Location]
-    command: t.Optional[Command]
+    location: t.Optional[Location] = None
+    command: t.Optional[Command] = None
 
 
 class InlayHintKind(enum.IntEnum):
@@ -827,12 +827,12 @@ class InlayHint(BaseModel):
 
     position: Position
     label: t.Union[str, t.List[InlayHintLabelPart]]
-    kind: t.Optional[InlayHintKind]
+    kind: t.Optional[InlayHintKind] = None
     textEdits: t.Optional[t.List[TextEdit]]
     tooltip: t.Optional[t.Union[str, MarkupContent]]
-    paddingLeft: t.Optional[bool]
-    paddingRight: t.Optional[bool]
-    data: t.Optional[t.Any]
+    paddingLeft: t.Optional[bool] = None
+    paddingRight: t.Optional[bool] = None
+    data: t.Optional[t.Any] = None
 
 
 class FoldingRange(BaseModel):
@@ -848,11 +848,11 @@ class FoldingRange(BaseModel):
     """
 
     startLine: int
-    startCharacter: t.Optional[int]
+    startCharacter: t.Optional[int] = None
     endLine: int
-    endCharacter: t.Optional[int]
-    kind: t.Optional[str]  # comment, imports, region
-    collapsedText: t.Optional[str]
+    endCharacter: t.Optional[int] = None
+    kind: t.Optional[str] = None  # comment, imports, region
+    collapsedText: t.Optional[str] = None
 
 
 class DocumentSymbol(BaseModel):
@@ -870,16 +870,19 @@ class DocumentSymbol(BaseModel):
     """
 
     name: str
-    detail: t.Optional[str]
+    detail: t.Optional[str] = None
     kind: SymbolKind
-    tags: t.Optional[t.List[SymbolTag]]
-    deprecated: t.Optional[bool]
-    range: Range
-    selectionRange: Range
-    children: t.Optional[t.List["DocumentSymbol"]]
+    tags: t.Optional[t.List[SymbolTag]] = None
+    deprecated: t.Optional[bool] = None
+    range: Range = Field(..., validate_default=True)
+    selectionRange: Range = Field(
+        ..., validate_default=True
+    )  # Example: symbol.selectionRange.start.as_tuple()
+    # https://stackoverflow.com/questions/36193540
+    children: t.Optional[t.List["DocumentSymbol"]] = None
 
 
-DocumentSymbol.update_forward_refs()
+DocumentSymbol.model_rebuild()
 
 
 class Registration(BaseModel):
@@ -893,7 +896,7 @@ class Registration(BaseModel):
 
     id: str
     method: str
-    registerOptions: t.Optional[t.Any]
+    registerOptions: t.Optional[t.Any] = None
 
 
 class FormattingOptions(BaseModel):
@@ -909,9 +912,9 @@ class FormattingOptions(BaseModel):
 
     tabSize: int
     insertSpaces: bool
-    trimTrailingWhitespace: t.Optional[bool]
-    insertFinalNewline: t.Optional[bool]
-    trimFinalNewlines: t.Optional[bool]
+    trimTrailingWhitespace: t.Optional[bool] = None
+    insertFinalNewline: t.Optional[bool] = None
+    trimFinalNewlines: t.Optional[bool] = None
 
 
 class WorkspaceFolder(BaseModel):
@@ -959,9 +962,9 @@ class WorkDoneProgressBeginValue(WorkDoneProgressValue):
 
     kind: Literal["begin"]
     title: str
-    cancellable: t.Optional[bool]
-    message: t.Optional[str]
-    percentage: t.Optional[int]
+    cancellable: t.Optional[bool] = None
+    message: t.Optional[str] = None
+    percentage: t.Optional[int] = None
 
 
 class WorkDoneProgressReportValue(WorkDoneProgressValue):
@@ -975,9 +978,9 @@ class WorkDoneProgressReportValue(WorkDoneProgressValue):
     """
 
     kind: Literal["report"]
-    cancellable: t.Optional[bool]
-    message: t.Optional[str]
-    percentage: t.Optional[int]
+    cancellable: t.Optional[bool] = None
+    message: t.Optional[str] = None
+    percentage: t.Optional[int] = None
 
 
 class WorkDoneProgressEndValue(WorkDoneProgressValue):
@@ -989,7 +992,7 @@ class WorkDoneProgressEndValue(WorkDoneProgressValue):
     """
 
     kind: Literal["end"]
-    message: t.Optional[str]
+    message: t.Optional[str] = None
 
 
 class ConfigurationItem(BaseModel):
@@ -1000,5 +1003,5 @@ class ConfigurationItem(BaseModel):
         section (Optional[str]): The section of the configuration this item belongs to.
     """
 
-    scopeUri: t.Optional[str]
-    section: t.Optional[str]
+    scopeUri: t.Optional[str] = None
+    section: t.Optional[str] = None

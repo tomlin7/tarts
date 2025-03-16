@@ -56,7 +56,8 @@ def find_method_marker(text, method):
       position returned will be 5 chars before `#...`: `sys.getdefaultencodi | ng()`
     """
     match = re.search(rf"\#{method}-(\d+)", text)
-    before_match = text[: match.start()]
+    assert match
+    before_match = text[:match.start()]
     lineno = before_match.count("\n")
     column = len(before_match.split("\n")[-1]) - int(match.group(1))
     return lsp.Position(line=lineno, character=column)
@@ -469,6 +470,7 @@ def check_that_langserver_works(langserver_name, tmp_path):
             assert len(sighelp.signatures) > 0
             active_sig = sighelp.signatures[sighelp.activeSignature]
             assert isinstance(active_sig, lsp.SignatureInformation)
+            assert active_sig.parameters
             assert len(active_sig.parameters) > 0
             assert isinstance(active_sig.parameters[0], lsp.ParameterInformation)
 

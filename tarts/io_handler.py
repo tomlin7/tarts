@@ -1,10 +1,12 @@
 import json
+import re
 import typing as t
-from email.message import Message
 
-from pydantic import parse_obj_as
+from pydantic import TypeAdapter
 
-from .structs import JSONDict, JSONList, Request, Response
+from .structs import Id, JSONDict, JSONList, Request, Response
+
+_CONTENT_TYPE_PARAM_RE = re.compile(r'(\w+)\s*=\s*(?:(?:"([^"]*)")|([^;,\s]*))')
 
 
 def _make_headers(content_length: int, encoding: str = "utf-8") -> bytes:
@@ -22,7 +24,7 @@ def _make_headers(content_length: int, encoding: str = "utf-8") -> bytes:
 def _make_request(
     method: str,
     params: t.Optional[JSONDict] = None,
-    id: t.Optional[int] = None,
+    id: t.Optional[Id] = None,
     *,
     encoding: str = "utf-8",
 ) -> bytes:
@@ -71,6 +73,19 @@ def _make_response(
     return request
 
 
+# Example: "application/vscode-jsonrpc; charset=utf-8" --> ("application/vscode-jsonrpc", {"charset": "utf-8"})
+def _parse_content_type(header: str) -> tuple[str, dict[str, str]]:
+    content_type, _, param_string = header.partition(";")
+    content_type = content_type.strip().lower()
+
+    metadata = {
+        m.group(1).lower(): (m.group(2) or m.group(3))
+        for m in _CONTENT_TYPE_PARAM_RE.finditer(param_string)
+    }
+
+    return content_type, metadata
+
+
 # _parse_messages is kind of tricky.
 #
 # It used to work like this:
@@ -97,6 +112,16 @@ def _make_response(
 def _parse_one_message(
     response_buf: bytearray,
 ) -> t.Optional[t.Iterable[t.Union[Request, Response]]]:
+    """Parse a single JSON-RPC message from a bytearray.
+
+    Args:
+        response_buf: A bytearray containing JSON-RPC messages.
+
+    Returns:
+        None if there's not enough data for a complete message,
+        or an iterable of Request or Response objects if a message was parsed successfully.
+
+    Note: This function modifies response_buf by removing parsed data."""
     if b"\r\n\r\n" not in response_buf:
         return None
 
@@ -119,11 +144,9 @@ def _parse_one_message(
     assert set(headers.keys()) == {"content-type", "content-length"}
 
     # Content-Type and encoding.
-    msg = Message()
-    msg['Content-Type'] = headers["content-type"]
-    content_type = msg.get_content_type()
+    content_type, metadata = _parse_content_type(headers["content-type"])
     assert content_type == "application/vscode-jsonrpc"
-    encoding = msg.get_param("charset")
+    encoding = metadata["charset"]
 
     # Content-Length
     content_length = int(headers["content-length"])
@@ -153,7 +176,7 @@ def _parse_one_message(
         data: JSONDict,
     ) -> t.Union[Request, Response]:
         del data["jsonrpc"]
-        return parse_obj_as(t.Union[Request, Response], data)  # type: ignore
+        return TypeAdapter(t.Union[Request, Response]).validate_python(data)
 
     content = json.loads(raw_content.decode(encoding))
 
@@ -165,6 +188,16 @@ def _parse_one_message(
 
 
 def _parse_messages(response_buf: bytearray) -> t.Iterator[t.Union[Response, Request]]:
+    """Parse all complete JSON-RPC messages from a bytearray.
+
+    Args:
+        response_buf: A bytearray containing zero or more JSON-RPC messages.
+
+    Returns:
+        An iterator yielding Request or Response objects for each complete message.
+        Partial messages at the end of the buffer are left for future parsing.
+
+    Note: This function modifies response_buf by removing parsed data."""
     while True:
         parsed = _parse_one_message(response_buf)
         if parsed is None:
